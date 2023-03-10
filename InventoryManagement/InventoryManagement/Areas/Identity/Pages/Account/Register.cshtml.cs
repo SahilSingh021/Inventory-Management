@@ -10,13 +10,16 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
+using InventoryManagement.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Rewrite;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace InventoryManagement.Areas.Identity.Pages.Account
@@ -27,6 +30,7 @@ namespace InventoryManagement.Areas.Identity.Pages.Account
         private readonly UserManager<IdentityUser> _userManager;
         private readonly IUserStore<IdentityUser> _userStore;
         private readonly IUserEmailStore<IdentityUser> _emailStore;
+        private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ILogger<RegisterModel> _logger;
         private readonly IEmailSender _emailSender;
 
@@ -35,7 +39,8 @@ namespace InventoryManagement.Areas.Identity.Pages.Account
             IUserStore<IdentityUser> userStore,
             SignInManager<IdentityUser> signInManager,
             ILogger<RegisterModel> logger,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            RoleManager<IdentityRole> roleManager)
         {
             _userManager = userManager;
             _userStore = userStore;
@@ -43,6 +48,7 @@ namespace InventoryManagement.Areas.Identity.Pages.Account
             _signInManager = signInManager;
             _logger = logger;
             _emailSender = emailSender;
+            _roleManager = roleManager;
         }
 
         /// <summary>
@@ -121,6 +127,19 @@ namespace InventoryManagement.Areas.Identity.Pages.Account
                 await _userStore.SetUserNameAsync(user, Input.Username, CancellationToken.None);
                 await _emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
                 var result = await _userManager.CreateAsync(user, Input.Password);
+
+                foreach (var role in Enum.GetValues(typeof(Roles)))
+                {
+                    var roleExists = await _roleManager.RoleExistsAsync(role.ToString());
+
+                    if (!roleExists)
+                    {
+                        var roleResult = await _roleManager.CreateAsync(new IdentityRole(role.ToString()));
+                        if (!roleResult.Succeeded) Console.WriteLine("Somethign went wrong...");
+                    }
+                }
+
+                await _userManager.AddToRoleAsync(user, Roles.Basic.ToString());
 
                 if (result.Succeeded)
                 {
